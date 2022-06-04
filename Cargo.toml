@@ -1,0 +1,14 @@
+[package]
+name = "kanatui"
+version = "0.1.0"
+edition = "2021"
+description = "simple tui tool for practicing japanese kana"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.1.18", features = ["derive"] }
+tui = "0.18.0"
+crossterm = "0.23"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_json = "1.0.81"
