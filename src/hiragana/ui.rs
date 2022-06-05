@@ -1,9 +1,9 @@
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Wrap},
     Frame,
 };
 
@@ -45,6 +45,21 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
         )
         .split(size);
 
+    let titles = app
+        .tabs
+        .iter()
+        .map(|&t| Spans::from(Span::from(t)))
+        .collect();
+    let tabs = Tabs::new(titles)
+        .divider("")
+        .highlight_style(
+            Style::default()
+                .bg(Color::Blue)
+                .add_modifier(Modifier::BOLD),
+        )
+        .select(app.tab_index);
+    frame.render_widget(tabs, main[0]);
+
     let inner = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
@@ -57,7 +72,7 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
 
     let list = List::new(app.item_state.items.clone())
         .block(left)
-        .highlight_style(Style::default().bg(Color::Cyan));
+        .highlight_style(Style::default().bg(Color::Blue));
     frame.render_stateful_widget(list, inner[0], &mut app.item_state.choose_state);
 
     let right = Block::default()
@@ -73,7 +88,7 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
         .collect();
     let list = List::new(selected_items)
         .block(right)
-        .highlight_style(Style::default().bg(Color::Cyan));
+        .highlight_style(Style::default().bg(Color::Blue));
     frame.render_stateful_widget(list, inner[1], &mut app.item_state.selected_state);
 
     let text = vec![Spans::from(vec![
@@ -89,4 +104,10 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
     let help = Block::default().borders(Borders::all()).title("Help");
     let description = Paragraph::new(text).block(help).wrap(Wrap { trim: false });
     frame.render_widget(description, main[2]);
+
+    match app.tab_index {
+        0 => {}
+        1 => {}
+        _ => {}
+    }
 }

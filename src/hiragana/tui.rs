@@ -5,7 +5,9 @@ use std::{
 };
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -30,7 +32,8 @@ pub struct HiraganaListState<'a> {
     pub items: Vec<ListItem<'a>>,
     pub selected: BTreeMap<usize, usize>,
     pub side: Side,
-    pub s_length: usize,
+    pub last_chosen: usize,
+    pub last_selected: usize,
 }
 
 impl<'a> HiraganaListState<'a> {
@@ -41,7 +44,8 @@ impl<'a> HiraganaListState<'a> {
             items,
             selected: BTreeMap::new(),
             side: Side::Left,
-            s_length: 0,
+            last_chosen: 0,
+            last_selected: 0,
         }
     }
 
@@ -119,15 +123,32 @@ impl<'a> HiraganaListState<'a> {
     }
 
     fn right(&mut self) {
+        if self.selected.is_empty() {
+            return;
+        }
+        match self.choose_state.selected() {
+            Some(i) => self.last_chosen = i,
+            None => {}
+        }
+        match self.side {
+            Side::Left => self.selected_state.select(Some(self.last_selected)),
+            Side::Right => {}
+        }
         self.side = Side::Right;
         self.choose_state.select(None);
-        self.selected_state.select(Some(0));
     }
 
     fn left(&mut self) {
+        match self.selected_state.selected() {
+            Some(i) => self.last_selected = i,
+            None => {}
+        }
+        match self.side {
+            Side::Left => {}
+            Side::Right => self.choose_state.select(Some(self.last_chosen)),
+        }
         self.side = Side::Left;
-        self.selected_state.select(None);
-        self.choose_state.select(Some(0));
+        self.selected_state.select(None)
     }
 
     fn choose(&mut self) {
@@ -146,7 +167,7 @@ impl<'a> HiraganaListState<'a> {
             Some(i) => {
                 let mut vec_selected: Vec<(&usize, &usize)> = self.selected.iter().collect();
 
-                if let Some(idx) = vec_selected.get(i) {
+                if let Some(_) = vec_selected.get(i) {
                     vec_selected.remove(i);
                 }
 
@@ -159,12 +180,28 @@ impl<'a> HiraganaListState<'a> {
 
 pub struct App<'a> {
     pub item_state: HiraganaListState<'a>,
+    pub tabs: Vec<&'a str>,
+    pub tab_index: usize,
 }
 
 impl<'a> App<'a> {
     fn new(items: Vec<ListItem<'a>>) -> Self {
         Self {
             item_state: HiraganaListState::new(items),
+            tabs: vec!["Choose", "Practice"],
+            tab_index: 0,
+        }
+    }
+
+    fn next_tab(&mut self) {
+        if self.tab_index == 0 {
+            self.tab_index = 1
+        }
+    }
+
+    fn prev_tab(&mut self) {
+        if self.tab_index == 1 {
+            self.tab_index = 0
         }
     }
 }
@@ -188,28 +225,37 @@ pub fn terminal() -> Result<(), io::Error> {
     loop {
         terminal.draw(|f| ui::ui(f, &mut app))?;
 
-        let timeout = Duration::from_millis(1000)
+        let timeout = Duration::from_millis(250)
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
 
         if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => break,
-                    KeyCode::Up => app.item_state.up(),
-                    KeyCode::Down => app.item_state.down(),
-                    KeyCode::Right => app.item_state.right(),
-                    KeyCode::Left => app.item_state.left(),
-                    KeyCode::Enter => app.item_state.choose(),
-                    KeyCode::Backspace | KeyCode::Delete => app.item_state.remove(),
-                    _ => {}
-                }
-                if let KeyCode::Char('q') = key.code {
-                    break;
+            if let Event::Key(event) = event::read()? {
+                match event {
+                    KeyEvent { code, modifiers } => {
+                        if modifiers == KeyModifiers::SHIFT {
+                            match code {
+                                KeyCode::Right => app.next_tab(),
+                                KeyCode::Left => app.prev_tab(),
+                                _ => {}
+                            }
+                        } else {
+                            match code {
+                                KeyCode::Char('q') => break,
+                                KeyCode::Up => app.item_state.up(),
+                                KeyCode::Down => app.item_state.down(),
+                                KeyCode::Right => app.item_state.right(),
+                                KeyCode::Left => app.item_state.left(),
+                                KeyCode::Enter => app.item_state.choose(),
+                                KeyCode::Backspace | KeyCode::Delete => app.item_state.remove(),
+                                _ => {}
+                            }
+                        }
+                    }
                 }
             }
         }
-        if last_tick.elapsed() >= Duration::from_millis(1000) {
+        if last_tick.elapsed() >= Duration::from_millis(250) {
             last_tick = Instant::now();
         }
     }
