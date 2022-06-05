@@ -1,9 +1,9 @@
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Span, Spans},
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 
@@ -11,6 +11,16 @@ use super::tui::App;
 
 pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
     let size = frame.size();
+
+    if size.height < 15 || size.width < 50 {
+        frame.render_widget(
+            Block::default()
+                .title("Window too small")
+                .title_alignment(Alignment::Center),
+            size,
+        );
+        return;
+    }
 
     let title = Span::styled(
         " [ Hiragana Practice ] ",
@@ -46,10 +56,9 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
         .title_alignment(Alignment::Center);
 
     let list = List::new(app.item_state.items.clone())
-        .highlight_symbol(">")
         .block(left)
         .highlight_style(Style::default().bg(Color::Cyan));
-    frame.render_stateful_widget(list, inner[0], &mut app.item_state.state);
+    frame.render_stateful_widget(list, inner[0], &mut app.item_state.choose_state);
 
     let right = Block::default()
         .title("Selected Kana")
@@ -63,10 +72,9 @@ pub fn ui<'a, B: Backend>(frame: &mut Frame<B>, app: &mut App<'a>) {
         .map(|(i, _)| app.item_state.items[*i].clone())
         .collect();
     let list = List::new(selected_items)
-        .highlight_symbol(">")
         .block(right)
         .highlight_style(Style::default().bg(Color::Cyan));
-    frame.render_stateful_widget(list, inner[1], &mut app.item_state.state);
+    frame.render_stateful_widget(list, inner[1], &mut app.item_state.selected_state);
 
     let text = vec![Spans::from(vec![
         Span::from("Navigate with the "),

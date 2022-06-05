@@ -1,0 +1,19 @@
+warning: unused imports: `Color`, `Style`
+  --> src/hiragana/tui.rs:14:13
+   |
+14 |     style::{Color, Style},
+   |             ^^^^^  ^^^^^
+   |
+   = note: `#[warn(unused_imports)]` on by default
+
+warning: `kanatui` (bin "kanatui") generated 1 warning
+    Finished dev [unoptimized + debuginfo] target(s) in 0.01s
+     Running `target/debug/kanatui hiragana`
+1
+0
+0
+0
+0
+2
+0
+1

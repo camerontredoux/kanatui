@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     io,
     time::{Duration, Instant},
 };
@@ -11,6 +11,7 @@ use crossterm::{
 };
 use tui::{
     backend::CrosstermBackend,
+    style::{Color, Style},
     text::Spans,
     widgets::{ListItem, ListState},
     Terminal,
@@ -18,56 +19,122 @@ use tui::{
 
 use super::{ui, Hiragana};
 
-pub struct HiraganaListState<T> {
-    pub state: ListState,
-    pub items: Vec<T>,
-    pub selected: BTreeMap<usize, bool>,
+pub enum Side {
+    Left,
+    Right,
 }
 
-impl<T> HiraganaListState<T> {
-    fn new(items: Vec<T>) -> Self {
+pub struct HiraganaListState<'a> {
+    pub choose_state: ListState,
+    pub selected_state: ListState,
+    pub items: Vec<ListItem<'a>>,
+    pub selected: BTreeMap<usize, usize>,
+    pub side: Side,
+    pub s_length: usize,
+}
+
+impl<'a> HiraganaListState<'a> {
+    fn new(items: Vec<ListItem<'a>>) -> Self {
         Self {
-            state: ListState::default(),
+            choose_state: ListState::default(),
+            selected_state: ListState::default(),
             items,
             selected: BTreeMap::new(),
+            side: Side::Left,
+            s_length: 0,
         }
     }
 
     fn up(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
+        match self.side {
+            Side::Left => {
+                let i = match self.choose_state.selected() {
+                    Some(i) => {
+                        if i == 0 {
+                            self.items.len() - 1
+                        } else {
+                            i - 1
+                        }
+                    }
+                    None => 0,
+                };
 
-        self.state.select(Some(i))
+                self.choose_state.select(Some(i))
+            }
+            Side::Right => {
+                if self.selected.is_empty() {
+                    return;
+                }
+                let i = match self.selected_state.selected() {
+                    Some(i) => {
+                        if i == 0 {
+                            self.selected.len() - 1
+                        } else {
+                            i - 1
+                        }
+                    }
+                    None => 0,
+                };
+
+                self.selected_state.select(Some(i))
+            }
+        }
     }
 
     fn down(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
+        match self.side {
+            Side::Left => {
+                let i = match self.choose_state.selected() {
+                    Some(i) => {
+                        if i >= self.items.len() - 1 {
+                            0
+                        } else {
+                            i + 1
+                        }
+                    }
+                    None => 0,
+                };
 
-        self.state.select(Some(i))
+                self.choose_state.select(Some(i))
+            }
+            Side::Right => {
+                if self.selected.is_empty() {
+                    return;
+                }
+
+                let i = match self.selected_state.selected() {
+                    Some(i) => {
+                        if i >= self.selected.len() - 1 {
+                            0
+                        } else {
+                            i + 1
+                        }
+                    }
+                    None => 0,
+                };
+
+                self.selected_state.select(Some(i))
+            }
+        }
     }
 
-    fn select(&mut self) {
-        match self.state.selected() {
+    fn right(&mut self) {
+        self.side = Side::Right;
+        self.choose_state.select(None);
+        self.selected_state.select(Some(0));
+    }
+
+    fn left(&mut self) {
+        self.side = Side::Left;
+        self.selected_state.select(None);
+        self.choose_state.select(Some(0));
+    }
+
+    fn choose(&mut self) {
+        match self.choose_state.selected() {
             Some(i) => {
                 if let None = self.selected.get(&i) {
-                    self.selected.insert(i, true);
+                    self.selected.insert(i, i);
                 }
             }
             None => {}
@@ -75,11 +142,15 @@ impl<T> HiraganaListState<T> {
     }
 
     fn remove(&mut self) {
-        match self.state.selected() {
+        match self.selected_state.selected() {
             Some(i) => {
-                if let Some(idx) = self.selected.get(&i) {
-                    self.selected.remove(&i);
+                let mut vec_selected: Vec<(&usize, &usize)> = self.selected.iter().collect();
+
+                if let Some(idx) = vec_selected.get(i) {
+                    vec_selected.remove(i);
                 }
+
+                self.selected = vec_selected.iter().map(|e| (*e.0, *e.1)).collect();
             }
             None => {}
         }
@@ -87,7 +158,7 @@ impl<T> HiraganaListState<T> {
 }
 
 pub struct App<'a> {
-    pub item_state: HiraganaListState<ListItem<'a>>,
+    pub item_state: HiraganaListState<'a>,
 }
 
 impl<'a> App<'a> {
@@ -127,7 +198,9 @@ pub fn terminal() -> Result<(), io::Error> {
                     KeyCode::Char('q') => break,
                     KeyCode::Up => app.item_state.up(),
                     KeyCode::Down => app.item_state.down(),
-                    KeyCode::Enter => app.item_state.select(),
+                    KeyCode::Right => app.item_state.right(),
+                    KeyCode::Left => app.item_state.left(),
+                    KeyCode::Enter => app.item_state.choose(),
                     KeyCode::Backspace | KeyCode::Delete => app.item_state.remove(),
                     _ => {}
                 }
